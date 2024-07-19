@@ -1,0 +1,3 @@
+/home/firefly/demortsp/build/CMakeFiles/demo_rtsp.dir
+/home/firefly/demortsp/build/CMakeFiles/edit_cache.dir
+/home/firefly/demortsp/build/CMakeFiles/rebuild_cache.dir

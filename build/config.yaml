@@ -1,0 +1,3 @@
+input_dev: "/dev/video40"  # 输入设备路径，根据实际情况修改
+rtsp_path: "/live/0"
+rtsp_port: 8554
