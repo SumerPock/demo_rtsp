@@ -8,6 +8,9 @@ Cam-->Rga callback-->opencv-->ModuleMemReader-->rga-->encoder-->rtsp
 #include <stdarg.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <csignal>
+#include <iostream>
+#include <yaml-cpp/yaml.h>
 
 #include "module/vi/module_rtspClient.hpp"
 #include "module/vp/module_mppdec.hpp"
@@ -18,7 +21,10 @@ Cam-->Rga callback-->opencv-->ModuleMemReader-->rga-->encoder-->rtsp
 #include "module/vo/module_drmDisplay.hpp"
 #include "module/vo/module_rtspServer.hpp"
 #include "module/vp/module_mppenc.hpp"
+
 #define ENABLE_OPENCV
+#define UNUSED(x) [&x] {}()
+using namespace std;
 
 //=============================================
 #ifdef ENABLE_OPENCV
@@ -28,12 +34,6 @@ Cam-->Rga callback-->opencv-->ModuleMemReader-->rga-->encoder-->rtsp
 #endif
 //=============================================
 
-#include<iostream>
-#include<yaml-cpp/yaml.h>
-
-
-#define UNUSED(x) [&x] {}()
-using namespace std;
 
 struct External_ctx {
     shared_ptr<ModuleMedia> module;
@@ -43,6 +43,19 @@ struct External_ctx {
 };
 
 int callback_count=0;
+
+
+using namespace std;
+
+std::atomic<bool> keep_running(true);
+
+void signal_handler(int signal)
+{
+    if (signal == SIGINT || signal == SIGTERM)
+    {
+        keep_running = false;
+    }
+}
 
 void callback_external(void* _ctx, shared_ptr<MediaBuffer> buffer)
 {
@@ -107,8 +120,10 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    shared_ptr<ModuleMedia> last_media;
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 
+    shared_ptr<ModuleMedia> last_media;
     /*解析配置文件
     *从命令行参数中读取配置文件的路径，并解析YAML文件获取输入设备，RTSP路径和端口等配置*/
     YAML::Node config = YAML::LoadFile(argv[1]);
@@ -209,7 +224,6 @@ int main(int argc, char** argv)
     output_para.vstride = output_para.height;
     output_para.v4l2Fmt = V4L2_PIX_FMT_NV12;
 
-
     auto rga2 = make_shared<ModuleRga>(output_para2, RGA_ROTATE_NONE);
     // auto rga = make_shared<ModuleRga>(input_para, RGA_ROTATE_NONE);
     rga2->setProductor(mem_r);
@@ -222,7 +236,6 @@ int main(int argc, char** argv)
 
     // 编码
     input_para = cam->getOutputImagePara();
-
     shared_ptr<ModuleMppEnc> mpp_e = make_shared<ModuleMppEnc>(
         ENCODE_TYPE_H265
         // 30,
@@ -258,7 +271,13 @@ int main(int argc, char** argv)
     mem_r->start();
     cam->dumpPipe();
     mem_r->dumpPipe();
-    getchar();
+    
+    //getchar(); 影响后台进程
+    while (keep_running)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
     cam->stop();
     mem_r->stop();
     return 0;
